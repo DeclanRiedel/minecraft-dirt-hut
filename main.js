@@ -8,94 +8,173 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+// Adjust the lighting
+const ambientLight = new THREE.AmbientLight(0xfffaf0, 1.0); // Full intensity, slightly warm
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xfff5e6, 1.0); // Full intensity, slightly warm
+directionalLight.position.set(5, 10, 5);
+scene.add(directionalLight);
+
+// Load Minecraft textures
+const textureLoader = new THREE.TextureLoader();
+function loadTexture(path) {
+    const texture = textureLoader.load(path);
+    texture.encoding = THREE.sRGBEncoding;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return texture;
+}
+
+const grassTopTexture = loadTexture('textures/grass_top.png');
+const grassSideTexture = loadTexture('textures/grass-side.png');
+const dirtTexture = loadTexture('textures/dirt.png');
+
+// Function to create a cube with Minecraft textures
+function createMinecraftCube(x, y, z, isGrass) {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const materials = [
+        new THREE.MeshStandardMaterial({ map: isGrass ? grassSideTexture : dirtTexture, color: 0xFFFFFF }), // right
+        new THREE.MeshStandardMaterial({ map: isGrass ? grassSideTexture : dirtTexture, color: 0xFFFFFF }), // left
+        new THREE.MeshStandardMaterial({ map: isGrass ? grassTopTexture : dirtTexture, color: 0xFFFFFF }),  // top
+        new THREE.MeshStandardMaterial({ map: dirtTexture, color: 0xFFFFFF }), // bottom
+        new THREE.MeshStandardMaterial({ map: isGrass ? grassSideTexture : dirtTexture, color: 0xFFFFFF }), // front
+        new THREE.MeshStandardMaterial({ map: isGrass ? grassSideTexture : dirtTexture, color: 0xFFFFFF })  // back
+    ];
+    
+    // Adjust material properties for more vibrant appearance
+    materials.forEach(material => {
+        material.roughness = 0.8; // Adjust for desired shininess
+        material.metalness = 0.0; // Non-metallic appearance
+        material.envMapIntensity = 1.0; // Enhance environment map effect if used
+    });
+
+    const cube = new THREE.Mesh(geometry, materials);
+    cube.position.set(x, y, z);
+    return cube;
+}
+
 // Create a group to hold all cubes
 const cubeGroup = new THREE.Group();
 scene.add(cubeGroup);
 
-// Function to create a cube with red edges
-function createCube(x, y, z, color) {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({ color: color });
-    const cube = new THREE.Mesh(geometry, material);
-    cube.position.set(x, y, z);
-
-    // Add red edges
-    const edgesGeometry = new THREE.EdgesGeometry(geometry);
-    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0xFF0000 });
-    const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
-    cube.add(edges);
-
-    return cube;
-}
-
-// Create floor (5x5 grid of green cubes)
+// Create floor (5x5 grid of grass blocks)
 for (let x = -2; x <= 2; x++) {
     for (let z = -2; z <= 2; z++) {
-        const cube = createCube(x, -0.5, z, 0x00FF00); // Green color
+        const cube = createMinecraftCube(x, 0, z, true); // true for grass blocks
         cubeGroup.add(cube);
     }
 }
 
+// Create 3x3 dirt hut with 2-block open center and 2-block door
+// Create walls
+for (let x = -1; x <= 1; x++) {
+    for (let z = -1; z <= 1; z++) {
+        // Skip center blocks
+        if (x === 0 && z >= 0) continue;
+        
+        // Create first layer of walls
+        cubeGroup.add(createMinecraftCube(x, 1, z, false)); // false for dirt blocks
+        
+        // Create second layer of walls
+        cubeGroup.add(createMinecraftCube(x, 2, z, false));
+    }
+}
+
+// Create roof
+for (let x = -1; x <= 1; x++) {
+    for (let z = -1; z <= 1; z++) {
+        cubeGroup.add(createMinecraftCube(x, 3, z, false));
+    }
+}
+
+// Camera setup
+const originalCameraRadius = 5.1; // Slightly further out than before
+let cameraRadius = originalCameraRadius;
+const minRadius = originalCameraRadius - 2;
+const maxRadius = originalCameraRadius + 2;
+const cameraHeight = 1.5; // Height of camera (1.5 units above surface)
+const centerHeight = 1.5; // Height of the point the camera looks at
+let cameraAngle = Math.PI / 2; // Start at 90 degrees (π/2 radians)
+
 // Set initial camera position
-const cameraRadius = 6;
-let cameraHorizontalAngle = 0;
-let cameraVerticalAngle = 0;
 updateCameraPosition();
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
+// Function to update camera position
+function updateCameraPosition() {
+    // Calculate camera position
+    camera.position.x = cameraRadius * Math.cos(cameraAngle);
+    camera.position.y = cameraHeight;
+    camera.position.z = cameraRadius * Math.sin(cameraAngle);
+    
+    // Set camera to look at the center point at height 1.5
+    camera.lookAt(0, centerHeight, 0);
+}
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-directionalLight.position.set(10, 10, 10);
-scene.add(directionalLight);
+// Camera movement
+let rotateLeft = false;
+let rotateRight = false;
+let zoomIn = false;
+let zoomOut = false;
+
+// Event listeners for key presses
+document.addEventListener('keydown', onKeyDown);
+document.addEventListener('keyup', onKeyUp);
+
+function onKeyDown(event) {
+    switch (event.code) {
+        case 'KeyA': rotateLeft = true; break;
+        case 'KeyD': rotateRight = true; break;
+        case 'KeyW': zoomIn = true; break;
+        case 'KeyS': zoomOut = true; break;
+    }
+}
+
+function onKeyUp(event) {
+    switch (event.code) {
+        case 'KeyA': rotateLeft = false; break;
+        case 'KeyD': rotateRight = false; break;
+        case 'KeyW': zoomIn = false; break;
+        case 'KeyS': zoomOut = false; break;
+    }
+}
+
+// Create a subtle background gradient
+const bgTexture = new THREE.CanvasTexture(createGradientCanvas());
+scene.background = bgTexture;
+
+function createGradientCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 2;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 2);
+    gradient.addColorStop(0, '#000000');
+    gradient.addColorStop(1, '#0a0a1a');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 2, 2);
+    return canvas;
+}
 
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
+
+    // Update camera position based on user input
+    if (rotateLeft) cameraAngle += 0.02;
+    if (rotateRight) cameraAngle -= 0.02;
+    
+    // Zoom in/out
+    if (zoomIn) cameraRadius = Math.max(minRadius, cameraRadius - 0.1);
+    if (zoomOut) cameraRadius = Math.min(maxRadius, cameraRadius + 0.1);
+
+    updateCameraPosition();
+
+    // Render the scene
     renderer.render(scene, camera);
 }
 
-// Camera movement
-let horizontalSpeed = 0;
-let verticalSpeed = 0;
-document.addEventListener('keydown', (event) => {
-    if (event.key === 'a' || event.key === 'A') horizontalSpeed = 0.02;
-    if (event.key === 'd' || event.key === 'D') horizontalSpeed = -0.02;
-    if (event.key === 'w' || event.key === 'W') verticalSpeed = 0.02;
-    if (event.key === 's' || event.key === 'S') verticalSpeed = -0.02;
-});
-
-document.addEventListener('keyup', (event) => {
-    if (event.key === 'a' || event.key === 'A' || event.key === 'd' || event.key === 'D') horizontalSpeed = 0;
-    if (event.key === 'w' || event.key === 'W' || event.key === 's' || event.key === 'S') verticalSpeed = 0;
-});
-
-function updateCameraPosition() {
-    // Calculate camera position using spherical coordinates
-    camera.position.x = cameraRadius * Math.sin(cameraVerticalAngle) * Math.cos(cameraHorizontalAngle);
-    camera.position.y = cameraRadius * Math.cos(cameraVerticalAngle);
-    camera.position.z = cameraRadius * Math.sin(cameraVerticalAngle) * Math.sin(cameraHorizontalAngle);
-    camera.lookAt(0, 0, 0); // Look at the center of the scene
-}
-
-function updateCamera() {
-    // Update camera angles based on user input
-    cameraHorizontalAngle += horizontalSpeed;
-    cameraVerticalAngle += verticalSpeed;
-    
-    // Normalize horizontal angle to keep it within 0 to 2π range
-    cameraHorizontalAngle = ((cameraHorizontalAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-    
-    // Clamp vertical angle to avoid flipping, allowing full vertical rotation
-    cameraVerticalAngle = Math.max(0.01, Math.min(Math.PI - 0.01, cameraVerticalAngle));
-    
-    updateCameraPosition();
-    requestAnimationFrame(updateCamera);
-}
-
+// Start the animation loop
 animate();
-updateCamera();
 
 // Handle window resizing
 window.addEventListener('resize', onWindowResize, false);
@@ -106,6 +185,9 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// Add a brown dirt cube on top of the center green cube
-const dirtCube = createCube(0, 0.5, 0, 0x8B4513); // Brown color
-cubeGroup.add(dirtCube);
+// Update renderer settings
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.gammaFactor = 2.2;
+renderer.physicallyCorrectLights = true;
