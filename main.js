@@ -9,10 +9,10 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // Adjust the lighting
-const ambientLight = new THREE.AmbientLight(0xfffaf0, 1.0); // Full intensity, slightly warm
+const ambientLight = new THREE.AmbientLight(0xfffaf0, 0.4); // Reduced intensity
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xfff5e6, 1.0); // Full intensity, slightly warm
+const directionalLight = new THREE.DirectionalLight(0xfff5e6, 0.8); // Reduced intensity
 directionalLight.position.set(5, 10, 5);
 scene.add(directionalLight);
 
@@ -30,6 +30,24 @@ const grassSideTexture = loadTexture('textures/grass_side.png');
 const dirtTexture = loadTexture('textures/dirt.png');
 const signPostTexture = loadTexture('textures/oak_side.png');
 const signBoardTexture = loadTexture('textures/oak_planks.png');
+const sunTexture = loadTexture('textures/sun.png');
+const bedrockTexture = loadTexture('textures/bedrock.png');
+
+// Create sun sprite
+const sunGeometry = new THREE.PlaneGeometry(3, 3); // Increased from 2 to 3
+const sunMaterial = new THREE.MeshBasicMaterial({
+    map: sunTexture,
+    transparent: true,
+    side: THREE.DoubleSide
+});
+const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+sun.position.set(10, 8, -10);
+scene.add(sun);
+
+// Add a point light at the sun's position
+const sunLight = new THREE.PointLight(0xFFFFFF, 1.5, 100); // Increased intensity
+sunLight.position.copy(sun.position);
+scene.add(sunLight);
 
 // Function to create a cube with Minecraft textures
 function createMinecraftCube(x, y, z, isGrass) {
@@ -59,11 +77,19 @@ function createMinecraftCube(x, y, z, isGrass) {
 const cubeGroup = new THREE.Group();
 scene.add(cubeGroup);
 
-// Create floor (5x5 grid of grass blocks)
+// Create floor (5x5 grid of grass blocks with bedrock in the center)
 for (let x = -2; x <= 2; x++) {
     for (let z = -2; z <= 2; z++) {
-        const cube = createMinecraftCube(x, 0, z, true); // true for grass blocks
-        cubeGroup.add(cube);
+        if (x === 0 && z === 0) {
+            // Create bedrock block in the center
+            const bedrockMaterial = new THREE.MeshStandardMaterial({ map: bedrockTexture, color: 0xFFFFFF });
+            const bedrockCube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), bedrockMaterial);
+            bedrockCube.position.set(x, 0, z);
+            cubeGroup.add(bedrockCube);
+        } else {
+            const cube = createMinecraftCube(x, 0, z, true); // true for grass blocks
+            cubeGroup.add(cube);
+        }
     }
 }
 
@@ -238,6 +264,17 @@ function animate() {
 
     updateCameraPosition();
 
+    // Update sun position
+    sun.position.x = camera.position.x + 10;
+    sun.position.y = camera.position.y + 8;
+    sun.position.z = camera.position.z - 10;
+
+    // Make sun always face the camera
+    sun.lookAt(camera.position);
+
+    // Update sunLight position
+    sunLight.position.copy(sun.position);
+
     // Render the scene
     renderer.render(scene, camera);
 }
@@ -264,10 +301,20 @@ function createGradientCanvas() {
     canvas.height = 2;
     const ctx = canvas.getContext('2d');
     const gradient = ctx.createLinearGradient(0, 0, 0, 2);
-    gradient.addColorStop(0, '#000000');
-    gradient.addColorStop(1, '#0a0a1a');
+    
+    // Sky gradient (top 60%)
+    gradient.addColorStop(0, '#4A90E2');    // Deeper Sky Blue
+    gradient.addColorStop(0.3, '#81C3FF');  // Lighter Sky Blue
+    gradient.addColorStop(0.6, '#B3E5FC');  // Very Light Blue
+    
+    // Darker gradient (bottom 40%)
+    gradient.addColorStop(0.6, '#B3E5FC');  // Very Light Blue (repeated for smooth transition)
+    gradient.addColorStop(0.8, '#4A5D80');  // Darker blue-gray
+    gradient.addColorStop(1, '#2C3E50');    // Even darker blue-gray (almost black)
+    
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 2, 2);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
     return canvas;
 }
 
