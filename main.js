@@ -26,7 +26,7 @@ function loadTexture(path) {
 }
 
 const grassTopTexture = loadTexture('textures/grass_top.png');
-const grassSideTexture = loadTexture('textures/grass-side.png');
+const grassSideTexture = loadTexture('textures/grass_side.png');
 const dirtTexture = loadTexture('textures/dirt.png');
 const signPostTexture = loadTexture('textures/oak_side.png');
 const signBoardTexture = loadTexture('textures/oak_planks.png');
@@ -89,40 +89,74 @@ for (let x = -1; x <= 1; x++) {
     }
 }
 
+// Function to create a texture with text
+function createTextTexture(text, width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+
+    // Draw wood texture background
+    const woodImg = new Image();
+    woodImg.src = 'textures/oak_planks.png';
+    
+    return new Promise((resolve) => {
+        woodImg.onload = () => {
+            context.drawImage(woodImg, 0, 0, width, height);
+
+            // Set text properties
+            context.fillStyle = 'black';
+            context.font = 'bold 28px Arial';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+
+            // Split text into lines
+            const lines = text.split('\n');
+            const lineHeight = 35;
+
+            // Draw each line of text
+            lines.forEach((line, index) => {
+                const y = (height / 2) - ((lines.length - 1) * lineHeight / 2) + (index * lineHeight);
+                context.fillText(line, width / 2, y);
+            });
+
+            resolve(new THREE.CanvasTexture(canvas));
+        };
+    });
+}
+
 // Function to create a Minecraft-style sign
-function createSign(x, y, z) {
-    console.log("Creating sign at:", x, y, z);
+async function createSign(x, y, z, text) {
     const signGroup = new THREE.Group();
 
-    // Create the sign post (vertical rod)
-    const postHeight = 0.8; // Reduced from 1.0 to 0.8
-    const postGeometry = new THREE.BoxGeometry(0.1, postHeight, 0.05);
+    // Create the sign post (using 1/6 of the texture width)
+    const postGeometry = new THREE.BoxGeometry(0.08, 0.9, 0.05);
     const postMaterial = new THREE.MeshStandardMaterial({ 
         map: signPostTexture,
-        roughness: 0.8,
-        metalness: 0.0
+        repeat: new THREE.Vector2(1/6, 0.9), // Changed to 1/6
+        wrapS: THREE.RepeatWrapping,
+        wrapT: THREE.RepeatWrapping
     });
     const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.set(0, postHeight / 2, 0); // Center the post vertically
+    post.position.y = 0.45; // Half of the post height
+    signGroup.add(post);
 
     // Create the sign board
-    const boardHeight = 0.4;
-    const boardGeometry = new THREE.BoxGeometry(0.6, boardHeight, 0.05);
-    const boardMaterial = new THREE.MeshStandardMaterial({ 
-        map: signBoardTexture,
-        roughness: 0.8,
-        metalness: 0.0
-    });
-    const board = new THREE.Mesh(boardGeometry, boardMaterial);
-    board.position.set(0, postHeight + boardHeight / 2, 0); // Position board on top of the post
-
-    signGroup.add(post);
+    const boardGeometry = new THREE.BoxGeometry(0.8, 0.5, 0.05);
+    const boardTexture = await createTextTexture(text, 256, 128);
+    const boardMaterials = [
+        new THREE.MeshStandardMaterial({ map: signBoardTexture }),
+        new THREE.MeshStandardMaterial({ map: signBoardTexture }),
+        new THREE.MeshStandardMaterial({ map: signBoardTexture }),
+        new THREE.MeshStandardMaterial({ map: signBoardTexture }),
+        new THREE.MeshStandardMaterial({ map: boardTexture }),
+        new THREE.MeshStandardMaterial({ map: signBoardTexture })
+    ];
+    const board = new THREE.Mesh(boardGeometry, boardMaterials);
+    board.position.y = 1.15; // Post height (0.9) + half of board height (0.5/2) = 1.15
     signGroup.add(board);
 
-    // Position the entire sign
     signGroup.position.set(x, y, z);
-
-    console.log("Sign created:", signGroup);
     return signGroup;
 }
 
@@ -130,7 +164,7 @@ function createSign(x, y, z) {
 const signX = -1; // X-coordinate of the chosen grass block
 const signY = 0; // Just above the surface of the block
 const signZ = 2; // Z-coordinate of the chosen grass block
-const sign = createSign(signX, signY, signZ);
+const sign = await createSign(signX, signY, signZ, "My Glorious\nEstate");
 cubeGroup.add(sign);
 console.log("Sign added to cubeGroup");
 
