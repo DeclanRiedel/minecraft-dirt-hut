@@ -28,8 +28,8 @@ function loadTexture(path) {
 const grassTopTexture = loadTexture('textures/grass_top.png');
 const grassSideTexture = loadTexture('textures/grass-side.png');
 const dirtTexture = loadTexture('textures/dirt.png');
-const signPostTexture = loadTexture('textures/oak_log.png');
-const signBoardTexture = loadTexture('textures/oakplanks.png');
+const signPostTexture = loadTexture('textures/oak_side.png');
+const signBoardTexture = loadTexture('textures/oak_planks.png');
 
 // Function to create a cube with Minecraft textures
 function createMinecraftCube(x, y, z, isGrass) {
@@ -95,24 +95,26 @@ function createSign(x, y, z) {
     const signGroup = new THREE.Group();
 
     // Create the sign post (vertical rod)
-    const postGeometry = new THREE.BoxGeometry(0.1, 1.0, 0.05);
+    const postHeight = 0.8; // Reduced from 1.0 to 0.8
+    const postGeometry = new THREE.BoxGeometry(0.1, postHeight, 0.05);
     const postMaterial = new THREE.MeshStandardMaterial({ 
         map: signPostTexture,
         roughness: 0.8,
         metalness: 0.0
     });
     const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.set(0, 0.5, 0);
+    post.position.set(0, postHeight / 2, 0); // Center the post vertically
 
     // Create the sign board
-    const boardGeometry = new THREE.BoxGeometry(0.6, 0.4, 0.05);
+    const boardHeight = 0.4;
+    const boardGeometry = new THREE.BoxGeometry(0.6, boardHeight, 0.05);
     const boardMaterial = new THREE.MeshStandardMaterial({ 
         map: signBoardTexture,
         roughness: 0.8,
         metalness: 0.0
     });
     const board = new THREE.Mesh(boardGeometry, boardMaterial);
-    board.position.set(0, 1.0, 0);
+    board.position.set(0, postHeight + boardHeight / 2, 0); // Position board on top of the post
 
     signGroup.add(post);
     signGroup.add(board);
