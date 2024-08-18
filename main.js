@@ -28,6 +28,8 @@ function loadTexture(path) {
 const grassTopTexture = loadTexture('textures/grass_top.png');
 const grassSideTexture = loadTexture('textures/grass-side.png');
 const dirtTexture = loadTexture('textures/dirt.png');
+const signPostTexture = loadTexture('textures/oak_log.png');
+const signBoardTexture = loadTexture('textures/oakplanks.png');
 
 // Function to create a cube with Minecraft textures
 function createMinecraftCube(x, y, z, isGrass) {
@@ -87,6 +89,54 @@ for (let x = -1; x <= 1; x++) {
     }
 }
 
+// Function to create a Minecraft-style sign
+function createSign(x, y, z) {
+    console.log("Creating sign at:", x, y, z);
+    const signGroup = new THREE.Group();
+
+    // Create the sign post (vertical rod)
+    const postGeometry = new THREE.BoxGeometry(0.1, 1.0, 0.05);
+    const postMaterial = new THREE.MeshStandardMaterial({ 
+        map: signPostTexture,
+        roughness: 0.8,
+        metalness: 0.0
+    });
+    const post = new THREE.Mesh(postGeometry, postMaterial);
+    post.position.set(0, 0.5, 0);
+
+    // Create the sign board
+    const boardGeometry = new THREE.BoxGeometry(0.6, 0.4, 0.05);
+    const boardMaterial = new THREE.MeshStandardMaterial({ 
+        map: signBoardTexture,
+        roughness: 0.8,
+        metalness: 0.0
+    });
+    const board = new THREE.Mesh(boardGeometry, boardMaterial);
+    board.position.set(0, 1.0, 0);
+
+    signGroup.add(post);
+    signGroup.add(board);
+
+    // Position the entire sign
+    signGroup.position.set(x, y, z);
+
+    console.log("Sign created:", signGroup);
+    return signGroup;
+}
+
+// Add the sign on the surface of a grass block
+const signX = -1; // X-coordinate of the chosen grass block
+const signY = 0; // Just above the surface of the block
+const signZ = 2; // Z-coordinate of the chosen grass block
+const sign = createSign(signX, signY, signZ);
+cubeGroup.add(sign);
+console.log("Sign added to cubeGroup");
+
+// In your animation loop or after adding the sign
+console.log("CubeGroup children:", cubeGroup.children);
+console.log("Sign position:", sign.position);
+console.log("Camera position:", camera.position);
+
 // Camera setup
 const originalCameraRadius = 5.1; // Slightly further out than before
 let cameraRadius = originalCameraRadius;
@@ -138,30 +188,13 @@ function onKeyUp(event) {
     }
 }
 
-// Create a subtle background gradient
-const bgTexture = new THREE.CanvasTexture(createGradientCanvas());
-scene.background = bgTexture;
-
-function createGradientCanvas() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2;
-    canvas.height = 2;
-    const ctx = canvas.getContext('2d');
-    const gradient = ctx.createLinearGradient(0, 0, 0, 2);
-    gradient.addColorStop(0, '#000000');
-    gradient.addColorStop(1, '#0a0a1a');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 2, 2);
-    return canvas;
-}
-
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
 
     // Update camera position based on user input
     if (rotateLeft) cameraAngle += 0.02;
-    if (rotateRight) cameraAngle -= 0.02;
+    if (rotateRight) cameraAngle -= 0.02; // Changed to subtract, moving in opposite direction
     
     // Zoom in/out
     if (zoomIn) cameraRadius = Math.max(minRadius, cameraRadius - 0.1);
@@ -185,9 +218,31 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+// Create a subtle background gradient
+const bgTexture = new THREE.CanvasTexture(createGradientCanvas());
+scene.background = bgTexture;
+
+function createGradientCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 2;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 2);
+    gradient.addColorStop(0, '#000000');
+    gradient.addColorStop(1, '#0a0a1a');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 2, 2);
+    return canvas;
+}
+
 // Update renderer settings
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.gammaFactor = 2.2;
 renderer.physicallyCorrectLights = true;
+
+// Add logging for debugging
+console.log("Scene children:", scene.children);
+console.log("Sign position:", sign.position);
+console.log("Camera position:", camera.position);
