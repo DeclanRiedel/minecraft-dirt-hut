@@ -1,4 +1,3 @@
-// Import Three.js library
 import * as THREE from './node_modules/three/build/three.module.js';
 
 // Scene setup
@@ -16,16 +15,15 @@ const directionalLight = new THREE.DirectionalLight(0xfff5e6, 0.8); // Warm sunl
 directionalLight.position.set(5, 10, 5);
 scene.add(directionalLight);
 
-// Texture loading function
+// Improve texture loading
 const textureLoader = new THREE.TextureLoader();
 function loadTexture(path) {
-    const texture = textureLoader.load(path);
-    texture.encoding = THREE.sRGBEncoding;
-    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    return texture;
+    return textureLoader.load(path, texture => {
+        texture.encoding = THREE.sRGBEncoding;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    });
 }
 
-// Load Minecraft textures
 const textures = {
     grassTop: loadTexture('textures/grass_top.png'),
     grassSide: loadTexture('textures/grass_side.png'),
@@ -52,23 +50,23 @@ const sunLight = new THREE.PointLight(0xFFFFFF, 1.5, 100); // Bright white light
 sunLight.position.copy(sun.position);
 scene.add(sunLight);
 
-// Function to create a Minecraft-style cube
+// Simplify cube creation
 function createMinecraftCube(x, y, z, isGrass) {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const materialOptions = {
+        color: 0xFFFFFF,
+        roughness: 0.8,
+        metalness: 0.0,
+        envMapIntensity: 1.0
+    };
     const materials = [
-        new THREE.MeshStandardMaterial({ map: isGrass ? textures.grassSide : textures.dirt, color: 0xFFFFFF }), // White
-        new THREE.MeshStandardMaterial({ map: isGrass ? textures.grassSide : textures.dirt, color: 0xFFFFFF }), // White
-        new THREE.MeshStandardMaterial({ map: isGrass ? textures.grassTop : textures.dirt, color: 0xFFFFFF }), // White
-        new THREE.MeshStandardMaterial({ map: textures.dirt, color: 0xFFFFFF }), // White
-        new THREE.MeshStandardMaterial({ map: isGrass ? textures.grassSide : textures.dirt, color: 0xFFFFFF }), // White
-        new THREE.MeshStandardMaterial({ map: isGrass ? textures.grassSide : textures.dirt, color: 0xFFFFFF }) // White
+        new THREE.MeshStandardMaterial({ ...materialOptions, map: isGrass ? textures.grassSide : textures.dirt }),
+        new THREE.MeshStandardMaterial({ ...materialOptions, map: isGrass ? textures.grassSide : textures.dirt }),
+        new THREE.MeshStandardMaterial({ ...materialOptions, map: isGrass ? textures.grassTop : textures.dirt }),
+        new THREE.MeshStandardMaterial({ ...materialOptions, map: textures.dirt }),
+        new THREE.MeshStandardMaterial({ ...materialOptions, map: isGrass ? textures.grassSide : textures.dirt }),
+        new THREE.MeshStandardMaterial({ ...materialOptions, map: isGrass ? textures.grassSide : textures.dirt })
     ];
-    
-    materials.forEach(material => {
-        material.roughness = 0.8;
-        material.metalness = 0.0;
-        material.envMapIntensity = 1.0;
-    });
 
     const cube = new THREE.Mesh(geometry, materials);
     cube.position.set(x, y, z);
@@ -93,12 +91,13 @@ for (let x = -2; x <= 2; x++) {
     }
 }
 
-// Create 3x3 dirt hut with 2-block open center and 2-block door
-for (let x = -1; x <= 1; x++) {
-    for (let z = -1; z <= 1; z++) {
-        if (x === 0 && z >= 0) continue;
-        cubeGroup.add(createMinecraftCube(x, 1, z, false));
-        cubeGroup.add(createMinecraftCube(x, 2, z, false));
+// Simplify hut creation
+for (let y = 1; y <= 2; y++) {
+    for (let x = -1; x <= 1; x++) {
+        for (let z = -1; z <= 1; z++) {
+            if (x === 0 && z >= 0) continue;
+            cubeGroup.add(createMinecraftCube(x, y, z, false));
+        }
     }
 }
 
@@ -138,7 +137,7 @@ async function createTextTexture(text, width, height) {
     return new THREE.CanvasTexture(canvas);
 }
 
-// Function to create a Minecraft-style sign
+// Improve sign creation
 async function createSign(x, y, z, text) {
     const signGroup = new THREE.Group();
 
@@ -155,14 +154,10 @@ async function createSign(x, y, z, text) {
 
     const boardGeometry = new THREE.BoxGeometry(0.8, 0.5, 0.05);
     const boardTexture = await createTextTexture(text, 256, 128);
-    const boardMaterials = [
-        new THREE.MeshStandardMaterial({ map: textures.signBoard }),
-        new THREE.MeshStandardMaterial({ map: textures.signBoard }),
-        new THREE.MeshStandardMaterial({ map: textures.signBoard }),
-        new THREE.MeshStandardMaterial({ map: textures.signBoard }),
-        new THREE.MeshStandardMaterial({ map: boardTexture }),
-        new THREE.MeshStandardMaterial({ map: textures.signBoard })
-    ];
+    const boardMaterial = new THREE.MeshStandardMaterial({ map: textures.signBoard });
+    const boardMaterials = Array(6).fill(boardMaterial);
+    boardMaterials[4] = new THREE.MeshStandardMaterial({ map: boardTexture });
+    
     const board = new THREE.Mesh(boardGeometry, boardMaterials);
     board.position.y = 1.15;
     signGroup.add(board);
@@ -179,72 +174,57 @@ const sign = await createSign(signX, signY, signZ, "My Glorious\nEstate");
 cubeGroup.add(sign);
 
 // Camera setup
-const originalCameraRadius = 5.1;
-let cameraRadius = originalCameraRadius;
-const minRadius = originalCameraRadius - 2;
-const maxRadius = originalCameraRadius + 2;
-const cameraHeight = 1.5;
-const centerHeight = 1.5;
-let cameraAngle = Math.PI / 2;
-
-// Set initial camera position
-updateCameraPosition();
+let cameraRadius = 8; // Initial radius for orbiting
+const minRadius = 5;
+const maxRadius = 12;
+const centerPoint = new THREE.Vector3(0, 1, 0); // Center on the first empty block above the structure
+let cameraTheta = Math.PI / 2; // Horizontal angle
+let cameraPhi = Math.PI / 2; // Vertical angle (start at equator)
 
 // Function to update camera position
 function updateCameraPosition() {
-    camera.position.x = cameraRadius * Math.cos(cameraAngle);
-    camera.position.y = cameraHeight;
-    camera.position.z = cameraRadius * Math.sin(cameraAngle);
+    const x = centerPoint.x + cameraRadius * Math.sin(cameraPhi) * Math.cos(cameraTheta);
+    const y = centerPoint.y + cameraRadius * Math.cos(cameraPhi);
+    const z = centerPoint.z + cameraRadius * Math.sin(cameraPhi) * Math.sin(cameraTheta);
     
-    camera.lookAt(0, centerHeight, 0);
+    camera.position.set(x, y, z);
+    camera.lookAt(centerPoint);
 }
 
-// Camera movement
-let rotateLeft = false;
-let rotateRight = false;
-let zoomIn = false;
-let zoomOut = false;
+// Simplify key handling
+const keyState = { rotateLeft: false, rotateRight: false, orbitUp: false, orbitDown: false, zoomIn: false, zoomOut: false };
+const keyMap = { 
+    KeyA: 'rotateLeft', 
+    KeyD: 'rotateRight', 
+    KeyW: 'orbitUp', 
+    KeyS: 'orbitDown',
+    KeyQ: 'zoomIn',
+    KeyE: 'zoomOut'
+};
 
-// Event listeners for key presses
-document.addEventListener('keydown', onKeyDown);
-document.addEventListener('keyup', onKeyUp);
-
-function onKeyDown(event) {
-    switch (event.code) {
-        case 'KeyA': rotateLeft = true; break;
-        case 'KeyD': rotateRight = true; break;
-        case 'KeyW': zoomIn = true; break;
-        case 'KeyS': zoomOut = true; break;
-    }
+function handleKey(event, isKeyDown) {
+    const key = keyMap[event.code];
+    if (key) keyState[key] = isKeyDown;
 }
 
-function onKeyUp(event) {
-    switch (event.code) {
-        case 'KeyA': rotateLeft = false; break;
-        case 'KeyD': rotateRight = false; break;
-        case 'KeyW': zoomIn = false; break;
-        case 'KeyS': zoomOut = false; break;
-    }
-}
+document.addEventListener('keydown', (e) => handleKey(e, true));
+document.addEventListener('keyup', (e) => handleKey(e, false));
 
-// Animation loop
+// Update animation loop
 function animate() {
     requestAnimationFrame(animate);
 
-    if (rotateLeft) cameraAngle += 0.02;
-    if (rotateRight) cameraAngle -= 0.02;
-
-    if (zoomIn) cameraRadius = Math.max(minRadius, cameraRadius - 0.1);
-    if (zoomOut) cameraRadius = Math.min(maxRadius, cameraRadius + 0.1);
+    if (keyState.rotateLeft) cameraTheta += 0.02;
+    if (keyState.rotateRight) cameraTheta -= 0.02;
+    if (keyState.orbitUp) cameraPhi = Math.max(0.01, cameraPhi - 0.02);
+    if (keyState.orbitDown) cameraPhi = Math.min(Math.PI - 0.01, cameraPhi + 0.02);
+    if (keyState.zoomIn) cameraRadius = Math.max(minRadius, cameraRadius - 0.1);
+    if (keyState.zoomOut) cameraRadius = Math.min(maxRadius, cameraRadius + 0.1);
 
     updateCameraPosition();
 
-    sun.position.x = camera.position.x + 10;
-    sun.position.y = camera.position.y + 8;
-    sun.position.z = camera.position.z - 10;
-
+    sun.position.set(camera.position.x + 10, camera.position.y + 8, camera.position.z - 10);
     sun.lookAt(camera.position);
-
     sunLight.position.copy(sun.position);
 
     renderer.render(scene, camera);
@@ -262,10 +242,7 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// Create a subtle background gradient
-const bgTexture = new THREE.CanvasTexture(createGradientCanvas());
-scene.background = bgTexture;
-
+// Improve gradient creation
 function createGradientCanvas() {
     const canvas = document.createElement('canvas');
     canvas.width = 2;
@@ -273,19 +250,25 @@ function createGradientCanvas() {
     const ctx = canvas.getContext('2d');
     const gradient = ctx.createLinearGradient(0, 0, 0, 2);
     
-    gradient.addColorStop(0, '#4A90E2'); // Light blue
-    gradient.addColorStop(0.3, '#81C3FF'); // Lighter blue
-    gradient.addColorStop(0.6, '#B3E5FC'); // Pastel blue
+    const colorStops = [
+        { stop: 0, color: '#4A90E2' },
+        { stop: 0.3, color: '#81C3FF' },
+        { stop: 0.6, color: '#B3E5FC' },
+        { stop: 0.8, color: '#4A5D80' },
+        { stop: 1, color: '#2C3E50' }
+    ];
     
-    gradient.addColorStop(0.6, '#B3E5FC'); // Pastel blue
-    gradient.addColorStop(0.8, '#4A5D80'); // Darker blue
-    gradient.addColorStop(1, '#2C3E50'); // Dark blue
+    colorStops.forEach(({ stop, color }) => gradient.addColorStop(stop, color));
     
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     return canvas;
 }
+
+// Create a subtle background gradient
+const bgTexture = new THREE.CanvasTexture(createGradientCanvas());
+scene.background = bgTexture;
 
 // Update renderer settings
 renderer.outputEncoding = THREE.sRGBEncoding;
